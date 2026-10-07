@@ -11,7 +11,7 @@
 // ─── CONFIGURATION ────────────────────────────────────────────────────────────
 // Google Apps Script Web App URL — the single backend endpoint for all API calls.
 // Must match GOOGLE_API_URL in index.html.
-const GOOGLE_API_URL = "YOUR_GOOGLE_SCRIPT_WEB_APP_URL_HERE";
+const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbyzzXHy6FuhZ2ht8WAifvD2hAWJTCoqmlhyq3FwN_hUnBjtIgaEWm1PKXT6dMz8XfpF/exec";
 
 // ─── CACHE VERSIONING ─────────────────────────────────────────────────────────
 // Cache name is auto-detected from <meta name="app-version" content="YYYYMMDD">
