@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CALGAS Workforce</title>
-    <link rel="icon" type="image/png" sizes="192x192" href="./logo/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./logo/icon-512.png">
-    <link rel="apple-touch-icon" href="./logo/icon-512.png">
+    <!-- ?v= forces browsers to refetch the tab icon instead of reusing a cached one -->
+    <link rel="icon" type="image/png" sizes="192x192" href="./logo/icon-192.png?v=20261007b">
+    <link rel="icon" type="image/png" sizes="512x512" href="./logo/icon-512.png?v=20261007b">
+    <link rel="apple-touch-icon" href="./logo/icon-512.png?v=20261007b">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <!-- sw.js reads this value at install time and uses it as the cache key,
          so bumping it evicts the old cache on the next visit. Format: YYYYMMDD -->
-    <meta name="app-version" content="20261007">
+    <meta name="app-version" content="20261007b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="CALGAS Workforce">
@@ -1270,7 +1271,7 @@
         }
     })();
 
-    const GOOGLE_API_ = "https://script.google.com/macros/s/AKfycbyzzXHy6FuhZ2ht8WAifvD2hAWJTCoqmlhyq3FwN_hUnBjtIgaEWm1PKXT6dMz8XfpF/exec";
+    const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbyzzXHy6FuhZ2ht8WAifvD2hAWJTCoqmlhyq3FwN_hUnBjtIgaEWm1PKXT6dMz8XfpF/exec";
 
     // Absolute, so the logo also resolves inside the payslip print window,
     // which is a separate document written from scratch.
@@ -1557,8 +1558,16 @@
         const res = await callGoogleAPI({ action: 'requestPasswordReset', username });
         btn.disabled = false; btn.innerText = 'Send Reset Code';
 
+        // The request never reached the server (offline, timeout, bad URL) —
+        // nothing was sent, so stay here rather than asking for a code.
+        if (!res || res.status !== 'success') {
+            msg.style.color = 'var(--danger)';
+            msg.innerText = (res && res.message) ? res.message : 'Could not reach the server. Try again.';
+            return;
+        }
+
         // Server always returns a generic success message — never reveals
-        // whether the username exists, so we just move to step 2 either way.
+        // whether the username exists, so we move to step 2 either way.
         msg.style.color = 'var(--text-muted)';
         msg.innerText = (res && res.message) ? res.message : 'If that username exists, a code has been sent.';
         document.getElementById('pwreset-step1').style.display = 'none';
