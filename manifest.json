@@ -1,0 +1,71 @@
+{
+  "name":        "CALGAS Workforce",
+  "short_name":  "CALGAS HR",
+  "description": "HR, Payroll, and AI Attendance System for CALGAS Capacitors — Navsari, Gujarat",
+
+  "start_url": "./index.html",
+  "scope":     "./",
+
+  "display":          "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+
+  "background_color": "#ffffff",
+  "theme_color":      "#ffffff",
+  "orientation":      "any",
+
+  "icons": [
+    {
+      "src":     "./logo/icon-192.png",
+      "sizes":   "192x192",
+      "type":    "image/png",
+      "purpose": "any"
+    },
+    {
+      "src":     "./logo/icon-512.png",
+      "sizes":   "512x512",
+      "type":    "image/png",
+      "purpose": "any"
+    },
+    {
+      "src":     "./logo/icon-512-maskable.png",
+      "sizes":   "512x512",
+      "type":    "image/png",
+      "purpose": "maskable"
+    }
+  ],
+
+  "shortcuts": [
+    {
+      "name":        "Punch IN",
+      "short_name":  "IN",
+      "description": "Open the kiosk screen and begin face recognition for punch-in",
+      "url":         "./index.html?action=in",
+      "icons": [
+        {
+          "src":   "./logo/icon-192.png",
+          "sizes": "192x192",
+          "type":  "image/png"
+        }
+      ]
+    },
+    {
+      "name":        "Punch OUT",
+      "short_name":  "OUT",
+      "description": "Open the kiosk screen and begin face recognition for punch-out",
+      "url":         "./index.html?action=out",
+      "icons": [
+        {
+          "src":   "./logo/icon-192.png",
+          "sizes": "192x192",
+          "type":  "image/png"
+        }
+      ]
+    }
+  ],
+
+  "categories": ["business", "productivity"],
+  "lang":       "en-IN",
+
+  "related_applications":        [],
+  "prefer_related_applications": false
+}
