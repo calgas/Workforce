@@ -122,11 +122,11 @@ async function readAppVersionFromHTML() {
     if (!response.ok) return null;
 
     const text = await response.text();
-    // Match: <meta name="app-version" content="20260513">
+    // Match: <meta name="app-version" content="20261007"> or a same-day revision like "20261007b"
     const match = text.match(/<meta[^>]+name=["']app-version["'][^>]+content=["']([^"']+)["']/i)
                 || text.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']app-version["']/i);
 
-    if (match && match[1] && /^\d{8}$/.test(match[1].trim())) {
+    if (match && match[1] && /^\d{8}[a-z]?$/.test(match[1].trim())) {
       return match[1].trim();
     }
   } catch (err) {
