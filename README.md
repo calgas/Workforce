@@ -76,6 +76,7 @@
 | Layer | Technology | Purpose |
 |---|---|---|
 | Frontend | HTML / CSS / Vanilla JS | Single-file PWA — no build step, responsive mobile-first layout with full light/dark theme support in CALGAS indigo (`#3d3f94`, taken from the logo). |
+| Typography | Montserrat (self-hosted variable font) | One 34 KB `woff2` file covers weights 100–900 for the whole app, the printed payslip and the offline page. Served from the repo and cached by the Service Worker, so it works offline. |
 | AI | face-api.js (TinyFaceDetector) | Client-side facial recognition — processes instantly via WebGL. Zero cloud calls. |
 | Backend | Google Apps Script (`doPost`) | REST-like API with script locking, session tokens, rate limiting, chunked cache, and biometric encryption. |
 | Database | Google Sheets (8 tabs) | Zero-cost persistent storage with ArrayFormulas for hours and overtime. |
@@ -94,6 +95,9 @@ Workforce/
 ├── index.html                      # Entire frontend — UI, styles, AI models, canvas overlays, and JS logic
 ├── manifest.json                   # PWA manifest — relative paths, local icons, shortcuts
 ├── sw.js                           # Service Worker — auto-versioned cache, offline fallback, background sync
+├── fonts/
+│   ├── montserrat-latin-var.woff2  # Montserrat variable font (weights 100–900), subset to Latin + ₹
+│   └── OFL.txt                     # SIL Open Font License for Montserrat
 ├── logo/                           # Logo files served from the repo (same set as Stock Management)
 │   ├── icon-192.png
 │   ├── icon-512.png
@@ -105,7 +109,7 @@ Workforce/
 └── README.md
 ```
 
-> Only `index.html`, `manifest.json`, `sw.js`, and the `logo/` folder are hosted on GitHub Pages.
+> Only `index.html`, `manifest.json`, `sw.js`, and the `fonts/` and `logo/` folders are hosted on GitHub Pages.
 > `Code.gs` lives in the Google Sheet's Apps Script project; the template and presentation are reference files.
 >
 > **Hosting:** `github.com/calgas/Workforce` → `https://calgas.github.io/Workforce/`.
@@ -144,6 +148,7 @@ Workforce/
 - **120-second countdown timer** visible live so the kiosk operator knows when it auto-closes.
 - The employee's `category` is passed to the server at punch time — the backend skips a redundant `getEmployees()` call for the SOT bonus check.
 - Face descriptors are fetched via the dedicated `getKioskFaceData` action (decrypted server-side, cached 15 minutes) rather than the general employee list — see [4.10](#410-data-protection--encrypted-biometrics--automated-backups).
+- **Kiosk punches are never dropped:** if a recognised punch can't reach the server (device offline, or Wi-Fi with no internet), it is saved to the offline queue with the time the face was recognised and syncs later. If the server simply takes too long to answer, the kiosk says "not confirmed — check History" instead of queuing a second copy.
 - The installed app's **Punch IN / Punch OUT** shortcuts open straight into the kiosk (`./index.html?action=in|out`).
 
 ### 4.3 Face Enrollment
@@ -156,6 +161,8 @@ Workforce/
 
 ### 4.4 True Offline Background Sync
 - If the factory loses internet, punches are saved directly to the browser's **IndexedDB** (`CalgasWorkforceDB`) — including `leaveType` (EL/LOP) and `shift` so all fields survive sync faithfully.
+- **Wi-Fi without internet** counts as offline too: the browser still reports "online", so a punch whose request fails before reaching the server is queued the same way, from both manual entry and the kiosk. A request that times out (it may already have reached the server) is reported as "not confirmed" rather than queued twice.
+- The Service Worker stays out of the API path entirely — API calls go straight from the page, so the page always sees the real outcome.
 - The Service Worker registers a `sync-punches` tag with the OS.
 - When the OS detects Wi-Fi, it silently POSTs all pending punches to `Code.gs` with a **25-second AbortController timeout** to prevent stalled sync events.
 - Backend deduplicates via fingerprint (`emplId|date|time|action`) — zero duplicate rows.
@@ -389,7 +396,7 @@ users, attendance or face data are carried over from any earlier deployment.
 9. Copy the Web App URL → paste into `GOOGLE_API_URL` in both `index.html` and `sw.js`.
 10. Add the `noreply@calgas.in` alias if needed, then run **`checkMailSender()`** once (Section 7.4).
 11. **One-time:** Run **`setupNightlyBackupTrigger()`** from the Apps Script editor (▶ Run) to install the 2 AM IST nightly backup schedule. Safe to re-run — existing triggers for this function are replaced, not duplicated.
-12. Create the **`calgas/Workforce`** GitHub repository. Upload `index.html`, `manifest.json`, `sw.js`, and the whole **`logo/`** folder (the Service Worker caches the logo files at install, so a missing file stops it installing). Settings → Pages → deploy from the `main` branch.
+12. Create the **`calgas/Workforce`** GitHub repository. Upload `index.html`, `manifest.json`, `sw.js`, and the whole **`fonts/`** and **`logo/`** folders (the Service Worker caches these files at install, so a missing file stops it installing). Settings → Pages → deploy from the `main` branch.
 13. Update `<meta name="app-version" content="YYYYMMDD">` in `index.html` to the deploy date.
 14. Open `https://calgas.github.io/Workforce/`, sign in as the Admin, then add HR / Security / Standby / Employee accounts and employees from **Inventory**. Enroll faces from the Employees list.
 
@@ -408,7 +415,7 @@ users, attendance or face data are carried over from any earlier deployment.
 - [ ] Updated `GOOGLE_API_URL` in **both** `index.html` and `sw.js` (no placeholder left).
 - [ ] `checkMailSender()` logs `✅ Mail will be sent as noreply@calgas.in`.
 - [ ] `setupNightlyBackupTrigger()` has been run — Apps Script → Triggers shows a `backupAllSheets` entry.
-- [ ] `logo/` folder uploaded alongside `index.html`, `manifest.json`, `sw.js`.
+- [ ] `fonts/` and `logo/` folders uploaded alongside `index.html`, `manifest.json`, `sw.js`.
 - [ ] Updated `<meta name="app-version" content="YYYYMMDD">` in `index.html`.
 - [ ] Populated **column E (Empl_ID)** in `Users` for all Employee-role accounts.
 - [ ] Populated **column C (Email)** in `Users` for accounts that need self-service password reset.
@@ -417,7 +424,7 @@ users, attendance or face data are carried over from any earlier deployment.
 
 ## 10. Offline & Sync Behaviour
 
-1. Device goes offline → `submitAttendance()` writes the punch to **IndexedDB** (`CalgasWorkforceDB`) including `leaveType`, `shift`, `loggedByUser`, and session token so all fields are preserved exactly.
+1. Device goes offline — or the request fails before reaching the server — → the punch is written to **IndexedDB** (`CalgasWorkforceDB`) by `queueOfflinePunch()`, including `leaveType`, `shift`, `loggedByUser`, the original punch time, and the session token so all fields are preserved exactly. Manual entry and the kiosk both use this path.
 2. A `sync-punches` tag is registered with the OS via `SyncManager`.
 3. When the OS regains Wi-Fi, `sw.js` silently POSTs punches to `Code.gs` with a **25-second AbortController timeout**. Stalled requests time out cleanly and the browser reschedules a retry.
 4. Punches are **grouped by session token** before sending — morning employee + afternoon admin punches authenticate independently.
@@ -528,7 +535,20 @@ If an employee is absent on a day sandwiched between two non-working days (Sunda
 
 ## 14. Version History
 
-### v13 — CALGAS Edition (October 2026, current)
+### v13.1 — Montserrat & Offline Safety (October 2026, current)
+
+| Area | Change |
+|---|---|
+| **Typography** | Whole app in **Montserrat** — UI, headings, buttons, inputs, kiosk name label, printed payslip (embedded in the saved PDF), and the offline page. Self-hosted variable font (`fonts/montserrat-latin-var.woff2`, 34 KB, weights 100–900, SIL OFL) replaces the Roboto / Work Sans request to Google Fonts. A size-matched local fallback keeps the layout from jumping while it loads. |
+| **Digits** | Tabular (fixed-width) digits app-wide, so the clock, counters and table columns don't shift as numbers change. |
+| **Narrow phones** | Mobile header and dashboard stat cards tightened below 420px for Montserrat's wider letterforms; card titles no longer run under the Edit / Mark Resolved badge. |
+| **Kiosk offline** | A recognised punch that can't reach the server is now saved to the offline queue (with recognition time) instead of being lost behind a toast. |
+| **Wi-Fi without internet** | Manual entry queues the punch when the request fails before reaching the server, instead of showing "Your punch has been saved offline" while saving nothing. Timeouts are reported as "not confirmed" and never queued twice. |
+| **Service Worker** | Out of the API path — no longer answers API calls on the page's behalf. Precaches the font. |
+| **Messages** | Unreachable server now reads "Can't reach the server. Check the internet connection and try again." for login, password reset and every other call. |
+| **Presentation** | Headings and body in Montserrat (repo copy first, Google Fonts when opened on its own); code stays monospace. |
+
+### v13 — CALGAS Edition (October 2026)
 
 The app, previously built and run for another plant, set up for CALGAS Capacitors on a fresh sheet.
 
@@ -565,6 +585,8 @@ The app, previously built and run for another plant, set up for CALGAS Capacitor
 9. **Attendance rules live in the sheet formulas:** The lunch deduction, overtime blocks and Sunday weekly off are in the J1/K1 formulas and the payroll code. A different CALGAS rule means changing the formula (and, for the weekly off, the backend's Sunday checks).
 10. **HS day overrides apply to the payslip only:** `getEmpDashData()` reads No. of Days from the `HS` tab; the Excel Salary Report always uses calendar days. They agree while `HS` holds calendar days (the template default).
 11. **Gujarat Labour Welfare Fund** (half-yearly employee/employer contribution) is not calculated.
+12. **Excel exports keep Excel's default font.** A font doesn't travel inside an `.xlsx`, so Montserrat would become a substitute on any PC without it installed; on-screen, print and PDF output all use Montserrat.
+13. **Characters outside Latin + ₹** (e.g. Gujarati or Devanagari names) fall back to the device's system font, since the font file is subset to keep it small.
 
 ---
 
@@ -589,7 +611,16 @@ The Google Sheet's locale isn't India. File → Settings → Locale: India, Time
 The J1/K1 `ARRAYFORMULA`s haven't been pasted into the `Data` tab (Section 6).
 
 **App won't install / Service Worker fails to install**
-A file listed in `sw.js` `SHELL_ASSETS` is missing on GitHub Pages — usually a logo. Upload the whole `logo/` folder, keeping the file names exactly (including `CALGAS CAPACITORS-logo-768x240.jpg` with its spaces).
+A file listed in `sw.js` `SHELL_ASSETS` is missing on GitHub Pages — usually a logo or the font. Upload the whole `fonts/` and `logo/` folders, keeping the file names exactly (including `CALGAS CAPACITORS-logo-768x240.jpg` with its spaces).
+
+**Text shows in Arial instead of Montserrat**
+`fonts/montserrat-latin-var.woff2` isn't on GitHub Pages, or an old cached build is running. Upload the `fonts/` folder, then use the refresh button or Ctrl+Shift+R.
+
+**"Can't reach the server. Check the internet connection and try again."**
+The request never left the device — no internet, Wi-Fi without internet, or a wrong `GOOGLE_API_URL` (check the constant's name and value in both `index.html` and `sw.js`). Punches made at that moment are queued and sync automatically; logins and password resets need the connection back.
+
+**"Not confirmed — the server took too long"**
+Google didn't answer within 30 seconds. The punch may or may not have been recorded — check the employee's status badge (manual entry) or History (kiosk) before punching again.
 
 **Camera frozen on "Starting Camera..."**
 The site must be served over **HTTPS**. Confirm the GitHub Pages URL uses `https://`.
@@ -627,4 +658,4 @@ If rotation itself doesn't work, the app must be **reinstalled** (not just refre
 ---
 
 *CALGAS Workforce — CALGAS Capacitors (CALGAS Mobility Pvt. Ltd.), Navsari, Gujarat.*
-*v13 — October 2026*
+*v13.1 — October 2026*
