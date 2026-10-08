@@ -18,7 +18,7 @@ const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbyzzXHy6FuhZ2ht8
 // in index.html at SW install time. Update that meta tag on every deploy.
 // If the tag is absent or the fetch fails, CACHE_DATE_FALLBACK is used instead.
 const CACHE_VERSION       = 'calgas-workforce-v1';
-const CACHE_DATE_FALLBACK = '20261007';   // ← bump this if NOT using the meta tag
+const CACHE_DATE_FALLBACK = '20261008';   // ← bump this if NOT using the meta tag
 
 // ─── INDEXED DB CONFIGURATION ────────────────────────────────────────────────
 const DB_NAME    = 'CalgasWorkforceDB';
@@ -39,7 +39,8 @@ const SHELL_ASSETS = [
   './logo/icon-192.png',
   './logo/icon-512.png',
   './logo/icon-512-maskable.png',
-  './logo/CALGAS%20CAPACITORS-logo-768x240.jpg'
+  './logo/CALGAS%20CAPACITORS-logo-768x240.jpg',
+  './fonts/montserrat-latin-var.woff2'
 ];
 
 // ─── AI MODEL ASSETS (pinned to @0.22.2) ─────────────────────────────────────
@@ -268,28 +269,22 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // 1. All POST requests → always pass directly to network.
-  //    Never attempt to cache POST bodies (GAS API, form submissions etc.)
-  if (event.request.method === 'POST') {
-    event.respondWith(
-      fetch(event.request).catch(() =>
-        new Response(
-          JSON.stringify({ status: 'error', message: 'Network unavailable. Your punch has been saved offline.' }),
-          { status: 503, headers: { 'Content-Type': 'application/json' } }
-        )
-      )
-    );
+  // 1. API calls and every non-GET request bypass the worker entirely.
+  //    The page's own fetch sees the real outcome — a network failure throws
+  //    there, and callGoogleAPI() queues the punch offline. Answering on the
+  //    page's behalf here could only hide failures or add new ones.
+  if (event.request.method !== 'GET' ||
+      requestUrl.hostname === 'script.google.com' ||
+      requestUrl.hostname === 'script.googleusercontent.com') {
     return;
   }
 
-  // 2. AI model weights + CDN fonts → Cache-First, Network-Fallback
+  // 2. AI model weights + CDN libraries → Cache-First, Network-Fallback
   //    These are large binary assets that change only when we bump the
   //    version pin. Serving from cache first keeps the kiosk snappy.
   const isDynamicAsset =
     requestUrl.pathname.includes('weights') ||
-    requestUrl.hostname.includes('jsdelivr') ||
-    requestUrl.hostname.includes('fonts.googleapis.com') ||
-    requestUrl.hostname.includes('fonts.gstatic.com');
+    requestUrl.hostname.includes('jsdelivr');
 
   if (isDynamicAsset) {
     event.respondWith(
@@ -508,9 +503,14 @@ function generateOfflineHTML() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CALGAS Workforce — Offline</title>
   <style>
+    @font-face {
+      font-family: 'Montserrat';
+      src: url('./fonts/montserrat-latin-var.woff2') format('woff2');
+      font-weight: 100 900; font-style: normal; font-display: swap;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, 'Outfit', sans-serif;
+      font-family: 'Montserrat', -apple-system, Arial, sans-serif;
       background: #03070f; color: #f0f4ff;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
